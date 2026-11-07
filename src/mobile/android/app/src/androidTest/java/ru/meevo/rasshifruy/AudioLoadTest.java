@@ -8,6 +8,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
 
 import com.k2fsa.sherpa.onnx.OfflineRecognizerResult;
+import com.k2fsa.sherpa.onnx.OfflineSpeakerDiarizationSegment;
 
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -17,34 +18,40 @@ import org.junit.runner.RunWith;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
+import ru.meevo.rasshifruy.assembly.SpeakerSegment;
+import ru.meevo.rasshifruy.assembly.TranscriptAssembler;
 import ru.meevo.rasshifruy.model.Utterance;
 import ru.meevo.rasshifruy.recognition.AudioDecoder;
 import ru.meevo.rasshifruy.recognition.ModelFiles;
 import ru.meevo.rasshifruy.recognition.OfflineAsr;
-import ru.meevo.rasshifruy.recognition.Segmenter;
+import ru.meevo.rasshifruy.recognition.SpeakerDiarizer;
 
 /**
- * Нагрузочный тест (lead-tester): декод + распознавание + RTF + память по всем тестовым аудио.
- * Для файлов длиннее 180 с декодируется/распознаётся первый 180-секундный кусок
- * (полный проход требует чанкинга — вне скоупа v2).
+ * Нагрузочный тест: полный прогон каждого файла по чанкам 60 с
+ * (декод -> ASR -> диаризация -> ассемблер) с замером времени по этапам.
  */
 @RunWith(AndroidJUnit4.class)
 public class AudioLoadTest {
 
     private static final String TAG = "GigaAMTest";
-    /** ~180 с исходных сэмплов при 44.1 кГц (короткие файлы декодируются целиком). */
-    private static final int MAX_SOURCE_SAMPLES = 180 * 44100;
+    private static final int CHUNK_SECONDS = 60;
 
     private static OfflineAsr asr;
+    private static SpeakerDiarizer diarizer;
 
     @BeforeClass
     public static void setUp() throws Exception {
         Context ctx = InstrumentationRegistry.getInstrumentation().getTargetContext();
-        ModelFiles.Paths paths = ModelFiles.prepare(ctx);
-        asr = new OfflineAsr(paths);
+        ModelFiles.Paths asrPaths = ModelFiles.prepare(ctx);
+        ModelFiles.DiarizationPaths diarPaths = ModelFiles.prepareDiarization(ctx);
+        asr = new OfflineAsr(asrPaths);
+        diarizer = new SpeakerDiarizer(diarPaths);
     }
 
     @AfterClass
@@ -52,6 +59,10 @@ public class AudioLoadTest {
         if (asr != null) {
             asr.release();
             asr = null;
+        }
+        if (diarizer != null) {
+            diarizer.release();
+            diarizer = null;
         }
     }
 
@@ -65,35 +76,65 @@ public class AudioLoadTest {
             File f = copyAsset(testContext, targetContext, name);
             long sizeBytes = f.length();
             double fullDurationSec = probeDurationSec(f);
-            boolean chunked = fullDurationSec > 180.0;
+            int sourceRate = AudioDecoder.getSourceSampleRate(f);
+            if (sourceRate <= 0) {
+                sourceRate = OfflineAsr.SAMPLE_RATE;
+            }
+            long totalUs = fullDurationSec > 0 ? (long) (fullDurationSec * 1_000_000.0) : 0;
+            int maxSourceSamples = CHUNK_SECONDS * sourceRate;
 
-            long t0 = System.currentTimeMillis();
-            float[] samples = AudioDecoder.decodeToMono16k(f, OfflineAsr.SAMPLE_RATE, MAX_SOURCE_SAMPLES);
-            long decodeMs = System.currentTimeMillis() - t0;
+            long decodeMs = 0;
+            long asrMs = 0;
+            long diarMs = 0;
+            int replicas = 0;
+            int chunks = 0;
+            Set<Integer> speakers = new HashSet<>();
+            long startUs = 0;
 
-            double recognizedSec = samples.length / (double) OfflineAsr.SAMPLE_RATE;
-            long decodedSamplesMb = Math.round(samples.length * 4L / 1048576.0);
+            while (chunks < 200 && (totalUs <= 0 || startUs < totalUs)) {
+                long t0 = System.currentTimeMillis();
+                float[] samples = AudioDecoder.decodeToMono16k(f, OfflineAsr.SAMPLE_RATE, startUs, maxSourceSamples);
+                decodeMs += System.currentTimeMillis() - t0;
+                if (samples.length == 0) {
+                    break;
+                }
+                float chunkSec = samples.length / (float) OfflineAsr.SAMPLE_RATE;
 
-            long memBefore = usedMemory();
-            long t1 = System.currentTimeMillis();
-            OfflineRecognizerResult res = asr.recognize(samples);
-            long recogMs = System.currentTimeMillis() - t1;
-            long memAfter = usedMemory();
+                long t1 = System.currentTimeMillis();
+                OfflineRecognizerResult res = asr.recognize(samples);
+                asrMs += System.currentTimeMillis() - t1;
 
-            List<Utterance> utts = Segmenter.build(
-                    res.getTokens(), res.getTimestamps(), (float) recognizedSec);
-            double rtf = recogMs / 1000.0 / recognizedSec;
+                long t2 = System.currentTimeMillis();
+                OfflineSpeakerDiarizationSegment[] ds = diarizer.process(samples);
+                diarMs += System.currentTimeMillis() - t2;
 
+                List<SpeakerSegment> segs = new ArrayList<>(ds.length);
+                for (OfflineSpeakerDiarizationSegment d : ds) {
+                    segs.add(new SpeakerSegment(d.getStart(), d.getEnd(), d.getSpeaker()));
+                    speakers.add(d.getSpeaker());
+                }
+                List<Utterance> utts = TranscriptAssembler.assemble(
+                        res.getTokens(), res.getTimestamps(), segs, chunkSec);
+                replicas += utts.size();
+
+                startUs += (long) CHUNK_SECONDS * 1_000_000L;
+                chunks++;
+                if (samples.length < OfflineAsr.SAMPLE_RATE * CHUNK_SECONDS * 0.9f) {
+                    break;
+                }
+            }
+
+            double rtf = (asrMs + diarMs) / 1000.0 / fullDurationSec;
             Log.d(TAG, "LOAD name=" + name
                     + " sizeMb=" + String.format(Locale.US, "%.2f", sizeBytes / 1048576.0)
-                    + " fullDurationSec=" + String.format(Locale.US, "%.1f", fullDurationSec)
+                    + " durationSec=" + String.format(Locale.US, "%.1f", fullDurationSec)
+                    + " chunks=" + chunks
                     + " decodeMs=" + decodeMs
-                    + " decodedSamplesMb=" + decodedSamplesMb
-                    + " recogMs=" + recogMs
+                    + " asrMs=" + asrMs
+                    + " diarMs=" + diarMs
                     + " rtf=" + String.format(Locale.US, "%.2f", rtf)
-                    + " replicas=" + utts.size()
-                    + " memDeltaMb=" + String.format(Locale.US, "%.1f", (memAfter - memBefore) / 1048576.0)
-                    + (chunked ? " CHUNKED=first180s" : " FULL"));
+                    + " replicas=" + replicas
+                    + " speakers=" + speakers.size());
         }
     }
 
@@ -115,11 +156,6 @@ public class AudioLoadTest {
             }
         }
         return -1;
-    }
-
-    private static long usedMemory() {
-        Runtime rt = Runtime.getRuntime();
-        return rt.totalMemory() - rt.freeMemory();
     }
 
     private static File copyAsset(Context testContext, Context targetContext, String name) throws Exception {

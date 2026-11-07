@@ -1,5 +1,5 @@
-file_name,size_mb,duration_sec,decode_ms,recognize_ms,rtf,replicas,mode,notes
-example.wav,0.34,11.3,73,2496,0.22,2,full,
-ru_long_consonants.ogg,1.43,139.4,13491,30658,0.22,35,full,
-переговоры.mp3,8.22,550.7,9486,46576,0.26,130,chunked_60s,замер по первому 180-с чанку
-подкаст.mp3,17.91,1174.0,9936,45402,0.25,62,chunked_60s,замер по первому 180-с чанку
+file_name,size_mb,duration_sec,chunks,decode_ms,asr_ms,diarization_ms,rtf,replicas
+example.wav,0.34,11.3,1,89,2513,1903,0.39,1
+ru_long_consonants.ogg,1.43,139.4,3,14438,27934,17292,0.32,3
+переговоры.mp3,8.22,550.7,10,29587,103113,64761,0.30,51
+подкаст.mp3,17.91,1174.0,20,65748,233485,185313,0.36,26
