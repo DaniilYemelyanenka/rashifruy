@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Расшифруй</string>
+    <string name="subtitle">от meevo</string>
+    <string name="btn_add_file">Добавить файл</string>
+    <string name="btn_export">Экспорт</string>
+    <!-- contentDescription кнопки-микрофона -->
+    <string name="btn_record">Записать</string>
+</resources>

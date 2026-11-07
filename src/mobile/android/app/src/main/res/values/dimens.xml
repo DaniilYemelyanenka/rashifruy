@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Базовый отступ экрана (добавляется к системным insets). -->
+    <dimen name="screen_padding">16dp</dimen>
+</resources>

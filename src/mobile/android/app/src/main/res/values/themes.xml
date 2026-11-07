@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Материальная тема «терракот по льну»: терракотовые акценты на льняном фоне.
+         Светлая тема зафиксирована намеренно — палитра «терракот по льну» светлая по своей сути. -->
+    <style name="Theme.Rasshifruy" parent="Theme.Material3.Light.NoActionBar">
+        <item name="colorPrimary">@color/terracotta</item>
+        <item name="colorOnPrimary">@color/linen</item>
+        <item name="colorPrimaryContainer">@color/terracotta_container</item>
+        <item name="colorOnPrimaryContainer">@color/terracotta_dark</item>
+
+        <item name="colorSecondary">@color/ink_muted</item>
+        <item name="colorOnSecondary">@color/linen</item>
+
+        <item name="colorSurface">@color/linen</item>
+        <item name="colorOnSurface">@color/ink</item>
+        <item name="colorSurfaceVariant">@color/linen_variant</item>
+        <item name="colorOnSurfaceVariant">@color/ink_muted</item>
+
+        <item name="android:colorBackground">@color/linen</item>
+        <item name="colorOnBackground">@color/ink</item>
+        <item name="colorOutline">@color/ink_muted</item>
+
+        <item name="android:statusBarColor">@color/linen</item>
+        <item name="android:navigationBarColor">@color/linen</item>
+
+        <!-- Заголовок не должен попадать в вырез камеры (notch/punch-hole). -->
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+        <!-- Тёмные значки системных панелей на светлом льняном фоне. -->
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+</resources>

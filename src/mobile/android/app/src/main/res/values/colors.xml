@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Палитра «терракот по льну»: тёплая терракота на льняном кремовом фоне. -->
+    <color name="terracotta">#C15B3C</color>
+    <color name="terracotta_dark">#8A3E27</color>
+    <color name="terracotta_container">#FFDBCE</color>
+    <color name="linen">#FAF0E6</color>
+    <color name="linen_variant">#F0DFD2</color>
+    <color name="ink">#3A2A22</color>
+    <color name="ink_muted">#6E5A50</color>
+
+    <!-- Фон adaptive-иконки приложения -->
+    <color name="ic_launcher_background">#C15B3C</color>
+</resources>

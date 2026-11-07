@@ -1,0 +1,22 @@
+# Gradle
+.gradle/
+build/
+
+# Локальная конфигурация и секреты (не коммитить)
+local.properties
+*.jks
+*.keystore
+
+# Сгенерированное IDE
+.idea/
+*.iml
+.DS_Store
+
+# Сборка/нативные артефакты
+/captures
+.externalNativeBuild
+.cxx
+
+# Личные записи (персональные данные) — не коммитить (AGENTS.md)
+src/mobile/android/app/src/androidTest/assets/переговоры.mp3
+src/mobile/android/app/src/androidTest/assets/подкаст.mp3
